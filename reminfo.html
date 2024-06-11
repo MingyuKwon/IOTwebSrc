@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>REM Sleep Data</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <a class="navbar-brand" href="https://s3.ap-northeast-2.amazonaws.com/test.main/main.html">Sleep Tracker</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a class="nav-link" href="https://s3.ap-northeast-2.amazonaws.com/test.main/sleepinfo.html">수면 기록보기</a>
+                </li>
+                <li class="nav-item active">
+                    <a class="nav-link" href="https://s3.ap-northeast-2.amazonaws.com/test.main/reminfo.html">렘 수면 기록보기</a>
+                </li>
+                <li class="nav-item active">
+                    <a class="nav-link" href="https://s3.ap-northeast-2.amazonaws.com/test.main/airinfo.html">수면질 기록보기</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="https://s3.ap-northeast-2.amazonaws.com/test.main/alarminfo.html">알람 정보 보기</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="https://s3.ap-northeast-2.amazonaws.com/test.main/main.html">알람 시간 입력하기</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container mt-5">
+        <h1 class="text-center mb-4">REM Sleep Data</h1>
+        <button class="btn btn-primary btn-block" onclick="getAvgTime()">Load REM Sleep Data</button>
+        <div id="resultDisplay" class="mt-4 p-3 border rounded">
+            <h2>Results:</h2>
+            <ul id="responseData" class="list-unstyled"></ul>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+    <script>
+        function getAvgTime() {
+            document.getElementById('responseData').innerHTML = "<li>Fetching data...</li>";
+            fetch("https://xn39crm7id.execute-api.ap-northeast-2.amazonaws.com/default/getRemAvg", {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            })
+            .then((response) => response.json())
+            .then((data) => {
+                displayAvgTimeData(data);
+            })
+            .catch((error) => {
+                console.error("Error:", error);
+                document.getElementById('responseData').innerHTML = "<li>Error fetching data</li>";
+            });
+        }
+
+         function displayAvgTimeData(data) {
+            const displayElement = document.getElementById('responseData');
+            displayElement.innerHTML = ''; // Clear previous data
+            data.remData.forEach((rem) => {
+                const remItem = document.createElement('li');
+                remItem.className = 'list-group-item mb-3'; // 스타일 추가
+                remItem.innerHTML = `
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Date: ${rem.dateTime}</h5>
+                            <p class="card-text">Average REM Period: ${rem.avgPeriod}</p>
+                        </div>
+                    </div>
+                `;
+                displayElement.appendChild(remItem);
+            });
+            const totalAvgItem = document.createElement('li');
+            totalAvgItem.className = 'list-group-item mb-3'; // 스타일 추가
+            totalAvgItem.innerHTML = `
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Average REM Period</h5>
+                        <p class="card-text">${data.totalAvg}</p>
+                    </div>
+                </div>
+            `;
+            displayElement.appendChild(totalAvgItem);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Air IoT Data</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <a class="navbar-brand" href="#">Sleep Tracker</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a class="nav-link" href="https://s3.ap-northeast-2.amazonaws.com/test.main/sleepinfo.html">수면 기록보기</a>
+                </li>
+                <li class="nav-item active">
+                    <a class="nav-link" href="https://s3.ap-northeast-2.amazonaws.com/test.main/reminfo.html">렘 수면 기록보기</a>
+                </li>
+                <li class="nav-item active">
+                    <a class="nav-link" href="https://s3.ap-northeast-2.amazonaws.com/test.main/airinfo.html">수면질 기록보기</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="https://s3.ap-northeast-2.amazonaws.com/test.main/alarminfo.html">알람 정보 보기</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="https://s3.ap-northeast-2.amazonaws.com/test.main/main.html">알람 시간 입력하기</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container mt-5">
+        <h1 class="text-center mb-4">Air IoT Data</h1>
+        <button class="btn btn-primary btn-block" onclick="getIotData()">Load IoT Data</button>
+        <div id="resultDisplay" class="mt-4 p-3 border rounded">
+            <h2>Results:</h2>
+            <ul id="responseData" class="list-unstyled"></ul>
+        </div>
+        <button class="btn btn-info btn-block mt-3" onclick="showLatestData()">Show Best Conditions</button>
+        <div id="latestDataDisplay" class="mt-3 p-3 border rounded">
+            <h2>Latest Conditions:</h2>
+            <p id="latestData"></p>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+    <script>
+        function getIotData() {
+            document.getElementById('responseData').innerHTML = "<li>Fetching data...</li>";
+            fetch("https://qgkr68r7jk.execute-api.ap-northeast-2.amazonaws.com/default/GetIotData", {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            })
+            .then((response) => response.json())
+            .then((data) => {
+                displayIotData(data);
+            })
+            .catch((error) => {
+                console.error("Error:", error);
+                document.getElementById('responseData').innerHTML = "<li>Error fetching data</li>";
+            });
+        }
+
+        function displayIotData(data) {
+            const groupedData = data.reduce((acc, item) => {
+                const date = item.date; // Using only the date part for grouping
+                if (!acc[date]) {
+                    acc[date] = { temp: [], humidity: [] };
+                }
+                acc[date].temp.push(parseFloat(item.temp.replace('°C', ''))); // Remove '°C' and convert to number
+                acc[date].humidity.push(parseFloat(item.humidity.replace('%', ''))); // Remove '%' and convert to number
+                return acc;
+            }, {});
+
+            const averages = Object.keys(groupedData).map(date => {
+                const temps = groupedData[date].temp;
+                const humidities = groupedData[date].humidity;
+                const avgTemp = temps.reduce((a, b) => a + b, 0) / temps.length;
+                const avgHumidity = humidities.reduce((a, b) => a + b, 0) / humidities.length;
+                return {
+                    date,
+                    avgTemp: avgTemp.toFixed(2) + '°C',
+                    avgHumidity: avgHumidity.toFixed(2) + '%'
+                };
+            });
+
+            const displayElement = document.getElementById('responseData');
+            displayElement.innerHTML = ''; // Clear previous data
+            averages.forEach(item => {
+                const listItem = document.createElement('li');
+                listItem.className = 'list-group-item mb-3';
+                listItem.innerHTML = `
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Date: ${item.date}</h5>
+                            <p class="card-text">Average Temperature: ${item.avgTemp}</p>
+                            <p class="card-text">Average Humidity: ${item.avgHumidity}</p>
+                        </div>
+                    </div>
+                `;
+                displayElement.appendChild(listItem);
+            });
+        }
+
+        function showLatestData() {
+            fetch("https://qgkr68r7jk.execute-api.ap-northeast-2.amazonaws.com/default/GetIotData", {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            })
+            .then((response) => response.json())
+            .then((data) => {
+                if (data && data.length > 0) {
+                    const latest = data[data.length - 1]; // 가장 최근 데이터
+                    const latestTemp = parseFloat(latest.temp.replace('°C', ''));
+                    const latestHumidity = parseFloat(latest.humidity.replace('%', ''));
+                    const idealTemp = 27;
+                    const idealHumidity = 60;
+
+                    const tempDiff = Math.abs(latestTemp - idealTemp);
+                    const humidityDiff = Math.abs(latestHumidity - idealHumidity);
+
+                    document.getElementById('latestData').innerHTML = `
+                        <strong>Latest Temperature:</strong> ${latestTemp}°C (Ideal is 27°C, Difference: ${tempDiff}°C)<br>
+                        <strong>Latest Humidity:</strong> ${latestHumidity}% (Ideal is 60%, Difference: ${humidityDiff}%)
+                    `;
+                } else {
+                    document.getElementById('latestData').innerHTML = "No data available.";
+                }
+            })
+            .catch((error) => {
+                console.error("Error fetching latest data:", error);
+                document.getElementById('latestData').innerHTML = "Error fetching data";
+            });
+        }
+
+    </script>
+</body>
+</html>

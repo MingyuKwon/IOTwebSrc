@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>REM Sleep Data</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <a class="navbar-brand" href="https://s3.ap-northeast-2.amazonaws.com/test.main/main.html">Sleep Tracker</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a class="nav-link" href="https://s3.ap-northeast-2.amazonaws.com/test.main/sleepinfo.html">수면 기록보기</a>
+                </li>
+                <li class="nav-item active">
+                    <a class="nav-link" href="https://s3.ap-northeast-2.amazonaws.com/test.main/reminfo.html">렘 수면 기록보기</a>
+                </li>
+                <li class="nav-item active">
+                    <a class="nav-link" href="https://s3.ap-northeast-2.amazonaws.com/test.main/airinfo.html">수면질 기록보기</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="https://s3.ap-northeast-2.amazonaws.com/test.main/alarminfo.html">알람 정보 보기</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="https://s3.ap-northeast-2.amazonaws.com/test.main/main.html">알람 시간 입력하기</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container mt-5">
+        <h1 class="text-center mb-4">Alarm Data</h1>
+        <button class="btn btn-primary btn-block" onclick="getTimeData()">Load Alarm Data</button>
+        <div id="totalAvgContainer" class="mt-4 text-center"></div>
+        <button type="button" id="calculateWakeUpTime" class="btn btn-primary mb-4">Calculate Optimal Wake Up Time</button>
+        <div id="resultDisplay" class="mt-4 p-3 border rounded">
+            <h2>Results:</h2>
+            <ul id="responseData" class="list-unstyled"></ul>
+        </div>
+    </div>
+
+     <!-- Update Modal -->
+    <div class="modal fade" id="updateModal" tabindex="-1" aria-labelledby="updateModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="updateModalLabel">Update Sleep Data</h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <form id="updateForm">
+              <input type="hidden" id="updateId">
+              <div class="form-group">
+                <label for="updateDesiredSleepHour">Desired Sleep Hour</label>
+                <input type="number" class="form-control" id="updateDesiredSleepHour" min="0" max="23">
+              </div>
+              <div class="form-group">
+                <label for="updateDesiredSleepMinute">Desired Sleep Minute</label>
+                <input type="number" class="form-control" id="updateDesiredSleepMinute" min="0" max="59">
+              </div>
+              <div class="form-group">
+                <label for="updateWakeUpHour">Wake Up Hour</label>
+                <input type="number" class="form-control" id="updateWakeUpHour" min="0" max="23">
+              </div>
+              <div class="form-group">
+                <label for="updateWakeUpMinute">Wake Up Minute</label>
+                <input type="number" class="form-control" id="updateWakeUpMinute" min="0" max="59">
+              </div>
+              <button type="submit" class="btn btn-primary">Update</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+    <script>
+        function timeToMinutes(timeStr) {
+            const timeParts = timeStr.split(' ');
+            const hours = parseInt(timeParts[0]);
+            const minutes = parseInt(timeParts[1]);
+            const seconds = parseInt(timeParts[2]);
+            const totalMinutes = hours * 60 + minutes + Math.round(seconds / 60);
+            return totalMinutes;
+        }
+
+        $(document).ready(function() {
+            let remAvg = 0;
+
+            // totalAvg 값을 가져오는 AJAX 요청
+            $.ajax({
+                url: 'https://xn39crm7id.execute-api.ap-northeast-2.amazonaws.com/default/getRemAvg',
+                method: 'GET',
+                success: function(response) {
+                    console.log('AJAX success response:', response);
+                    remAvg = response.totalAvg;
+                    $('#totalAvgContainer').text('Total Avg Period: ' + response.totalAvg);
+                },
+                error: function(error) {
+                    console.error('Error fetching totalAvg:', error);
+                    $('#totalAvgContainer').text('Error fetching total average period');
+                }
+            });
+
+            // "Calculate Optimal Wake Up Time" 버튼 클릭 이벤트
+            $('#calculateWakeUpTime').on('click', function() {
+                console.log('Calculate button clicked');
+                let remMin = timeToMinutes(remAvg);
+                const maxMin = 1440; // 총 하루의 분 24 * 60 
+                console.log(remMin);
+                // 각 데이터 항목을 순회하면서 계산
+                $('.list-group-item').each(function() {    
+                    const desiredSleepHour = parseInt($(this).find('.desiredSleepHour').text().trim()); //시간
+                    const desiredSleepMinute = parseInt($(this).find('.desiredSleepMinute').text().trim());//분
+                    const wakeUpHour = parseInt($(this).find('.wakeUpHour').text().trim());//시간
+                    const wakeUpMinute = parseInt($(this).find('.wakeUpMinute').text().trim());//분
+
+                    let desiredSleepTotalMinutes = desiredSleepHour * 60 + desiredSleepMinute; // 분단위로 전환
+                    let wakeUpTotalMinutes = wakeUpHour * 60 + wakeUpMinute; // 분단위로 전환 
+                        
+                    console.log("remMin:",remMin);
+                    console.log(`Desired Min: ${desiredSleepTotalMinutes}, Wake Min: ${wakeUpTotalMinutes}`);
+                    if(desiredSleepTotalMinutes >= wakeUpTotalMinutes){
+                        console.log("if..");
+                        while (true) {
+                            if (desiredSleepTotalMinutes + remMin <= maxMin) {
+                                desiredSleepTotalMinutes += remMin;
+                            } else {
+                                desiredSleepTotalMinutes = (desiredSleepTotalMinutes + remMin) % maxMin;
+                                break;
+                            }
+                        }
+                        while(true){
+                            if (desiredSleepTotalMinutes + remMin >= wakeUpTotalMinutes) {
+                                break;  
+                            }else{
+                                desiredSleepTotalMinutes += remMin;
+                            }
+                        }
+                    }else{
+                        while (true) {
+                            if (desiredSleepTotalMinutes + remMin >= wakeUpTotalMinutes) {
+                                break;
+                            } else {
+                                desiredSleepTotalMinutes += remMin;
+                            }
+                        }
+                    }
+                    const optimalWakeUpHour = Math.floor(desiredSleepTotalMinutes / 60);
+                    const optimalWakeUpMinute = desiredSleepTotalMinutes % 60;
+
+                    $(this).find('.optimalWakeUpTime').text(`Optimal Wake Up Time: ${optimalWakeUpHour}시간 ${optimalWakeUpMinute}분`);
+                });
+            });
+        });
+
+        function getTimeData() {
+            document.getElementById('responseData').innerHTML = "<li>Fetching data...</li>";
+            fetch("https://860s5tqs2b.execute-api.ap-northeast-2.amazonaws.com/24-05-15/test-resource", {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            })
+            .then((response) => response.json())
+            .then((data) => {
+                displayTimeData(data);
+            })
+            .catch((error) => {
+                console.error("Error:", error);
+                document.getElementById('responseData').innerHTML = "<li>Error fetching data</li>";
+            });
+        }
+
+        function displayTimeData(data) {
+            const displayElement = document.getElementById('responseData');
+            displayElement.innerHTML = ''; // Clear previous data
+            data.forEach((item) => {
+                const listItem = document.createElement('li');
+                listItem.className = 'list-group-item';
+                listItem.innerHTML = `
+                    <p class="mb-1">Desired Sleep Time: <span class="desiredSleepHour">${item.desiredSleepHour}</span> : <span class="desiredSleepMinute">${item.desiredSleepMinute}</span></p>
+                    <p class="mb-1">Wake Up Time: <span class="wakeUpHour">${item.wakeUpHour}</span> : <span class="wakeUpMinute">${item.wakeUpMinute}</span></p>
+                    <p class="mb-1 optimalWakeUpTime">Optimal Wake Up Time: 00:00</p>
+                    <button class="btn btn-warning btn-sm" onclick="editData('${item._id}', ${item.desiredSleepHour}, ${item.desiredSleepMinute}, ${item.wakeUpHour}, ${item.wakeUpMinute})">Update</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteData('${item._id}')">Delete</button>
+                `;
+                displayElement.appendChild(listItem);
+            });
+        }
+
+        // 데이터 수정 함수
+        function editData(id, desiredSleepHour, desiredSleepMinute, wakeUpHour, wakeUpMinute) {
+            document.getElementById('updateId').value = id;
+            document.getElementById('updateDesiredSleepHour').value = desiredSleepHour;
+            document.getElementById('updateDesiredSleepMinute').value = desiredSleepMinute;
+            document.getElementById('updateWakeUpHour').value = wakeUpHour;
+            document.getElementById('updateWakeUpMinute').value = wakeUpMinute;
+            $('#updateModal').modal('show');
+        }
+
+        // 데이터 삭제 함수
+        function deleteData(id) {
+            if (confirm('Are you sure you want to delete this data?')) {
+                fetch(`https://860s5tqs2b.execute-api.ap-northeast-2.amazonaws.com/24-05-15/test-resource/${id}`, { // Replace with your actual endpoint URL
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Id_:', id);
+                    alert('Data deleted successfully! id:' + id);
+                    location.reload(); // 새로고침하여 데이터를 갱신
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while deleting the data.');
+                });
+            }
+        }
+
+        // 데이터 업데이트 함수
+        document.getElementById('updateForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const id = document.getElementById('updateId').value;
+            const updatedData = {
+                desiredSleepHour: document.getElementById('updateDesiredSleepHour').value,
+                desiredSleepMinute: document.getElementById('updateDesiredSleepMinute').value,
+                wakeUpHour: document.getElementById('updateWakeUpHour').value,
+                wakeUpMinute: document.getElementById('updateWakeUpMinute').value,
+            };
+
+            fetch(`https://860s5tqs2b.execute-api.ap-northeast-2.amazonaws.com/24-05-15/test-resource/${id}`, { // Replace with your actual endpoint URL
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(updatedData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert('Data updated successfully!');
+                $('#updateModal').modal('hide');
+                location.reload(); // 새로고침하여 데이터를 갱신
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while updating the data.');
+            });
+        });
+
+    </script>
+</body>
+</html>
